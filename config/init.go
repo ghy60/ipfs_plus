@@ -45,6 +45,11 @@ func InitWithIdentity(identity Identity) (*Config, error) {
 			MDNS: MDNS{
 				Enabled: true,
 			},
+			ExportPeers: ExportPeers{
+				Enabled:      true,
+				DumpFile:     "",  // 空字符串表示使用默认路径 kubo/peers.dump
+				DumpInterval: 120, // 每2分钟导出一次
+			},
 		},
 
 		Routing: Routing{
