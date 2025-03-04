@@ -7,13 +7,16 @@ import (
 
 	version "github.com/ipfs/kubo"
 	config "github.com/ipfs/kubo/config"
+	"github.com/ipfs/kubo/core/node/helpers"
 
 	logging "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
+	"github.com/libp2p/go-libp2p-kad-dht/dual"
 	"go.uber.org/fx"
 )
 
@@ -99,5 +102,21 @@ func ForceReachability(val *config.OptionalString) func() (opts Libp2pOpts, err 
 			return opts, fmt.Errorf("unrecognized reachability option: %s", v)
 		}
 		return
+	}
+}
+
+// 配置主动发现服务
+func ConfigureActiveDiscovery(cfg *config.Config) interface{} {
+	return func(mctx helpers.MetricsCtx, lc fx.Lifecycle, h host.Host, dht *dual.DHT, disc *discoveryHandler) error {
+		// 启动主动发现服务
+		activeDiscovery := SetupActiveDiscovery()
+		if activeDiscovery != nil {
+			if enabled, err := activeDiscovery.(func(helpers.MetricsCtx, fx.Lifecycle, host.Host, *dual.DHT, *discoveryHandler, *config.Config) (bool, error))(mctx, lc, h, dht, disc, cfg); err != nil {
+				return err
+			} else if enabled {
+				log.Info("active peer discovery service enabled")
+			}
+		}
+		return nil
 	}
 }

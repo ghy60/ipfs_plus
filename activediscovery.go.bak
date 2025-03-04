@@ -13,10 +13,10 @@ import (
 	"github.com/ipfs/kubo/core/node/helpers"
 )
 
-// 主动探索的间隔时间
+// GHY: 添加主动探索的间隔时间常量，优化网络节点发现频率
 const activeDiscoveryInterval = time.Minute * 10
 
-// 主动从DHT中查找随机节点，以便发现更多节点
+// GHY: 添加了SetupActiveDiscovery函数，实现主动从DHT中查找随机节点的功能
 func SetupActiveDiscovery() interface{} {
 	return func(mctx helpers.MetricsCtx, lc fx.Lifecycle, host host.Host, dht *dual.DHT, disc *discoveryHandler, cfg *config.Config) (bool, error) {
 		if dht == nil {
@@ -24,7 +24,7 @@ func SetupActiveDiscovery() interface{} {
 			return false, nil
 		}
 
-		// 创建节点导出器
+		// GHY: 创建节点导出器实例，用于将发现的节点信息导出到数据库
 		exporter, err := NewNodeExporter()
 		if err != nil {
 			log.Errorf("Failed to create node exporter: %v", err)
@@ -33,7 +33,7 @@ func SetupActiveDiscovery() interface{} {
 
 		ctx := helpers.LifecycleCtx(mctx, lc)
 
-		// 启动后台协程，定期执行主动发现
+		// GHY: 启动后台协程，定期执行主动发现
 		go func() {
 			// 等待系统启动完成
 			time.Sleep(time.Minute)
@@ -58,7 +58,7 @@ func SetupActiveDiscovery() interface{} {
 	}
 }
 
-// 执行主动节点发现，并将发现的节点信息导出
+// GHY: 添加了discoverPeers函数，实现主动节点发现和信息导出
 func discoverPeers(ctx context.Context, host host.Host, disc *discoveryHandler, exporter *NodeExporter) {
 	log.Info("starting active peer discovery")
 
@@ -66,23 +66,21 @@ func discoverPeers(ctx context.Context, host host.Host, disc *discoveryHandler, 
 	currentPeers := len(host.Network().Peers())
 	log.Infof("currently connected to %d peers", currentPeers)
 
-	// 处理现有的节点
+	// GHY: 处理现有的节点，收集节点信息并导出
 	for _, p := range host.Network().Peers() {
 		// 获取节点信息
 		addrInfo := host.Peerstore().PeerInfo(p)
 		
-		// 获取协议版本
+		// GHY: 获取更多节点元数据，包括协议版本、代理版本和延迟
 		protocolVersion, _ := host.Peerstore().Get(p, "ProtocolVersion")
 		protoVer, _ := protocolVersion.(string)
 		
-		// 获取代理版本
 		agentVersion, _ := host.Peerstore().Get(p, "AgentVersion")
 		agentVer, _ := agentVersion.(string)
 		
-		// 获取延迟
 		latency := host.Peerstore().LatencyEWMA(p)
 		
-		// 导出节点信息
+		// GHY: 导出节点信息到数据库，标记为主动发现
 		if err := exporter.ExportNode(ctx, addrInfo, "active", protoVer, agentVer, int64(latency)); err != nil {
 			log.Errorf("Failed to export node info: %v", err)
 		}
@@ -101,7 +99,7 @@ func discoverPeers(ctx context.Context, host host.Host, disc *discoveryHandler, 
 		}
 	}
 
-	// 从节点仓库获取所有已知节点
+	// GHY: 从节点仓库获取所有已知节点，并尝试连接未连接的节点
 	allPeers := host.Peerstore().Peers()
 	log.Infof("peerstore contains %d peers", len(allPeers))
 
@@ -117,15 +115,13 @@ func discoverPeers(ctx context.Context, host host.Host, disc *discoveryHandler, 
 				} else {
 					connectedCount++
 					
-					// 获取协议版本
+					// GHY: 收集节点元数据并导出到数据库
 					protocolVersion, _ := host.Peerstore().Get(pid, "ProtocolVersion")
 					protoVer, _ := protocolVersion.(string)
 					
-					// 获取代理版本
 					agentVersion, _ := host.Peerstore().Get(pid, "AgentVersion")
 					agentVer, _ := agentVersion.(string)
 					
-					// 获取延迟
 					latency := host.Peerstore().LatencyEWMA(pid)
 					
 					// 导出节点信息
